@@ -1,0 +1,76 @@
+```{r}
+library(readr)
+library(dplyr)
+library(lubridate)
+library(magrittr)
+library(data.table)
+library(ggplot2)
+```
+
+
+```{r}
+file_root<-"https://www.ndbc.noaa.gov/view_text_file.php?filename=44013h"
+year<-"2023"
+tail<- ".txt.gz&dir=data/historical/stdmet/"
+path<-paste0(file_root,year,tail)
+header=scan(path,what= 'character',nlines=1)
+buoy<-fread(path,header=FALSE,skip=2)
+colnames(buoy)<-header
+```
+```{r}
+buoy$ATMP <- ifelse(buoy$ATMP == 999, NA, buoy$ATMP)
+buoy$WDIR <- ifelse(buoy$WDIR == 999, NA, buoy$WDIR)
+buoy$MWD <- ifelse(buoy$MWD == 999, NA, buoy$MWD)
+buoy$DEWP <- ifelse(buoy$DEWP == 999, NA, buoy$DEWP)
+View(buoy)
+
+```
+
+
+```{r}
+
+buoy$month <- format(as.Date(paste(buoy$`#YY`, buoy$MM, buoy$DD, sep="-")), "%Y-%m")
+
+monthly_temp <- buoy %>%
+  group_by(month) %>%
+  summarise(mean_temp = mean(ATMP, na.rm = TRUE))
+
+ggplot(monthly_temp, aes(x = month, y = mean_temp, group = 1)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "2023 Climate change by month ", x = "month", y = "avarage temp") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+monthly_temp$month_numeric <- as.numeric(as.factor(monthly_temp$month))
+
+
+model <- lm(mean_temp ~ month_numeric, data = monthly_temp)
+summary(model)  
+
+## the p-vale is 0.05726, is greater than 0.05 that indicate the liner relationship between the  month and temperature is close to significant but does not reach the usual threshold of significance. Temperature variations are usually not determined by the month alone, but are also influenced by other environmental factors
+
+
+```
+
+```{r}
+rainfall_data <- read.csv("Rainfall.csv")
+
+rainfall_data$DATE <- as.POSIXct(rainfall_data$DATE, format="%Y%m%d %H:%M")
+
+rainfall_data$year <- format(rainfall_data$DATE, "%Y")
+
+
+annual_rainfall_stats <- rainfall_data %>%
+  group_by(year) %>%
+  summarise(mean_rainfall = mean(HPCP, na.rm = TRUE),
+            total_rainfall = sum(HPCP, na.rm = TRUE))
+
+ggplot(annual_rainfall_stats, aes(x = as.numeric(year), y = total_rainfall)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Total Rainfall in Boston (1985-2013)", x = "Year", y = "Total Rainfall (inches)") +
+  theme_minimal()
+
+```
+
